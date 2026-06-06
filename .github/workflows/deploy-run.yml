@@ -1,4 +1,4 @@
-name: Build & Run Spring Boot Docker
+name: Build & Push Spring Boot Docker
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-run:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,33 +24,14 @@ jobs:
       - name: Build JAR with Maven
         run: mvn clean package -DskipTests -B
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build Docker image
-        run: docker build -t spring-app:latest .
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/spring-app:latest .
 
-      - name: Run Docker container
-        run: |
-          docker run -d \
-            --name spring-app \
-            -p 8080:8080 \
-            -e SPRING_PROFILES_ACTIVE=prod \
-            spring-app:latest
-
-      - name: Wait for app to start
-        run: |
-          echo "Waiting for Spring Boot to start..."
-          for i in {1..15}; do
-            if curl -sf http://localhost:8080/actuator/health; then
-              echo "App is up!"
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "App failed to start" && docker logs spring-app && exit 1
-
-      - name: Run smoke tests (optional)
-        run: |
-          curl -sf http://localhost:8080/actuator/health | grep '"status":"UP"'
-
-      - name: Stop container
-        if: always()
-        run: docker rm -f spring-app || true
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/spring-app:latest
